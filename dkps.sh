@@ -9,9 +9,9 @@ NC='\033[0m' # No Color
 
 # Determine the width for each column
 ID_WIDTH=13
-NAME_WIDTH=16
+NAME_WIDTH=30
 STATE_WIDTH=8
-PORTS_WIDTH=30
+PORTS_WIDTH=40
 
 # Function to print a horizontal line with color to simulate a border
 print_border_line () {
@@ -58,8 +58,32 @@ printf "%b" "${CYAN}$(truncate_or_pad_string 'PORTS' $PORTS_WIDTH)${NC}"
 printf "%b\n" "${YELLOW}|${NC}"
 print_border_line
 
+format_ports() {
+    local ports=$1
+    ports=$(printf "%s\n" "$ports" | tr ',' '\n')
+    local line=""
+    for port in $ports; do
+        if [[ $port == *":::"* ]]; then
+            host=$(printf "%s\n" "$port" | awk -F '->' '{print $1}' | awk -F ':' '{print $NF}' | awk '{$1=$1};1')
+            container=$(printf "%s\n" "$port" | awk -F '->' '{print $2}' | awk -F '/' '{print $1}' | awk '{$1=$1};1')
+            line+="P  ${host}: C  ${container}| "
+        fi
+    done
+    line=$(printf "%s" "$line" | sed 's/ | $//')
+    line=$(printf "%s" "$line" | sed 's/|$//') 
+    line=$(printf "%s" "$line" | sed 's/| $//')
+    if [[ $(printf "%s" "$line" | tr -cd '|' | wc -c) -gt 1 ]]; then
+        line=$(printf "%s" "$line" | awk -F '|' '{print $1"| "$2"| ..."}')
+    else
+        line=$(printf "%s" "$line" | awk -F '|' '{print $1" | "$2}')
+    fi
+    line=$(truncate_or_pad_string "$line" $PORTS_WIDTH)
+    line=$(printf "%s" "$line" | sed 's/P /🌐/g' | sed 's/C /🐋/g' )
+    printf "%b" "$line"
+}
+
 # Use docker ps with --format to specify what information should be printed
-docker ps -a --format "{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Ports}}" | sort -k2 | \
+docker ps -a  --format "{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Ports}}" | sort -k2 | \
 while read -r id names state ports; do
     printf "%b" "${YELLOW}|${NC}"
     printf "%b" "$(truncate_or_pad_string $id $ID_WIDTH)"
@@ -68,7 +92,7 @@ while read -r id names state ports; do
     printf "%b" "${YELLOW}|${NC}"
     print_state_with_color $state
     printf "%b" "${YELLOW}|${NC}"
-    printf "%b" "$(truncate_or_pad_string "$ports" $PORTS_WIDTH)"
+    printf "%b" "$(format_ports "$ports")"
     printf "%b\n" "${YELLOW}|${NC}" 
 done
 
