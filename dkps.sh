@@ -36,13 +36,13 @@ truncate_or_pad_string () {
 }
 
 print_state_with_color() {
-      local state=$1
-      if [ "$state" = "running" ]; then
-        printf "%b" "${GREEN}$(truncate_or_pad_string $state $STATE_WIDTH)${NC}"
-      else
-        printf "%b" "${RED}$(truncate_or_pad_string $state $STATE_WIDTH)${NC}"
-      fi
-    }
+  local state=$1
+  if [ "$state" = "running" ]; then
+    printf "%b" "${GREEN}$(truncate_or_pad_string $state $STATE_WIDTH)${NC}"
+  else
+    printf "%b" "${RED}$(truncate_or_pad_string $state $STATE_WIDTH)${NC}"
+  fi
+}
 
 
 # Print the table with borders
@@ -59,32 +59,37 @@ printf "%b\n" "${YELLOW}|${NC}"
 print_border_line
 
 format_ports() {
-    local ports=$1
-    ports=$(printf "%s\n" "$ports" | tr ',' '\n')
-    local line=""
-    for port in $ports; do
-        if [[ $port == *":::"* ]]; then
-            host=$(printf "%s\n" "$port" | awk -F '->' '{print $1}' | awk -F ':' '{print $NF}' | awk '{$1=$1};1')
-            container=$(printf "%s\n" "$port" | awk -F '->' '{print $2}' | awk -F '/' '{print $1}' | awk '{$1=$1};1')
-            line+="P  ${host}: C  ${container}| "
-        fi
-    done
-    line=$(printf "%s" "$line" | sed 's/ | $//')
-    line=$(printf "%s" "$line" | sed 's/|$//') 
-    line=$(printf "%s" "$line" | sed 's/| $//')
-    if [[ $(printf "%s" "$line" | tr -cd '|' | wc -c) -gt 1 ]]; then
-        line=$(printf "%s" "$line" | awk -F '|' '{print $1"| "$2"| ..."}')
-    else
-        line=$(printf "%s" "$line" | awk -F '|' '{print $1" | "$2}')
+  local ports=$1
+  ports=$(printf "%s\n" "$ports" | tr ',' '\n')
+  local line=""
+  local hostSymbol="P"
+  local containerSymbol="C"
+  if [ "$(expr substr $(uname -s) 1 5)" == "Linux" ]; then
+    hostSymbol="🌐"
+    containerSymbol="🐋"
+  fi
+  for port in $ports; do
+    if [[ $port == *":::"* ]]; then
+      host=$(printf "%s\n" "$port" | awk -F '->' '{print $1}' | awk -F ':' '{print $NF}' | awk '{$1=$1};1')
+      container=$(printf "%s\n" "$port" | awk -F '->' '{print $2}' | awk -F '/' '{print $1}' | awk '{$1=$1};1')
+      line="${line}${hostSymbol}  ${host}: ${containerSymbol}  ${container}| "
     fi
-    line=$(truncate_or_pad_string "$line" $PORTS_WIDTH)
-    line=$(printf "%s" "$line" | sed 's/P /🌐/g' | sed 's/C /🐋/g' )
-    printf "%b" "$line"
+  done
+  line=$(printf "%s" "$line" | sed 's/ | $//')
+  line=$(printf "%s" "$line" | sed 's/|$//')
+  line=$(printf "%s" "$line" | sed 's/| $//')
+  if [[ $(printf "%s" "$line" | tr -cd '|' | wc -c) -gt 1 ]]; then
+    line=$(printf "%s" "$line" | awk -F '|' '{print $1"| "$2"| ..."}')
+  else
+    line=$(printf "%s" "$line" | awk -F '|' '{print $1" | "$2}')
+  fi
+  line=$(truncate_or_pad_string "$line" $PORTS_WIDTH)
+  printf "%b" "$line"
 }
 
 # Use docker ps with --format to specify what information should be printed
 docker ps -a  --format "{{.ID}}\t{{.Names}}\t{{.State}}\t{{.Ports}}" | sort -k2 | \
-while read -r id names state ports; do
+  while read -r id names state ports; do
     printf "%b" "${YELLOW}|${NC}"
     printf "%b" "$(truncate_or_pad_string $id $ID_WIDTH)"
     printf "%b" "${YELLOW}|${NC}"
@@ -93,7 +98,7 @@ while read -r id names state ports; do
     print_state_with_color $state
     printf "%b" "${YELLOW}|${NC}"
     printf "%b" "$(format_ports "$ports")"
-    printf "%b\n" "${YELLOW}|${NC}" 
-done
+    printf "%b\n" "${YELLOW}|${NC}"
+  done
 
 print_border_line
